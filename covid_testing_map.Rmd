@@ -48,7 +48,7 @@ Variables Include:
       + Fraction No Health Insurance
       + Fraction Poverty
       + Fraction Vacant Housing
-      + [Deprivation Index](geomarker.io/dep_index)
+      + [Deprivation Index](https://geomarker.io/dep_index)
       
   * Long Term Care Facility Locations (ltcf)
   
