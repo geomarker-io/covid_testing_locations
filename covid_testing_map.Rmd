@@ -1,0 +1,146 @@
+---
+title: "COVID-19 Testing Site Planning"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    theme: bootstrap
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+<font size="3.5">
+
+This map displays census tract-level data in Hamilton County for informing decisions on COVID testing locations.
+
+Using the menu on the left-hand side of the map, you can toggle variables on/off.
+
+Clicking on a tract displays all variables for that tract.
+
+</font>
+
+<font size="3">
+
+Variables Include: 
+
+  * Testing Variables
+      + Positive Tests per 1000 Population
+      + Total Tests per 1000 Population
+      + Fraction Positive Tests (Positive Tests / Total Tests)
+  
+  * American Community Survey Sociodemographic Variables from [The Public Health Disparities Geocoding Project](https://www.hsph.harvard.edu/thegeocodingproject/covid-19-resources/)
+      + Percent People of Color (not White Non-Hispanic / Total)
+      + Racial/Economic ICE (Index of Concentration at the Extremes for white non-Hispanic high income vs. people of color low income)
+      + Total Population 
+      + % Crowding (>1 person per room)
+      
+  * Other American Community Survey Sociodeomgraphic Variables
+      + Population Over Age 65
+      + Population Density
+      + Fraction Assisted Income
+      + Fraction High School Education
+      + Median Income
+      + Fraction No Health Insurance
+      + Fraction Poverty
+      + Fraction Vacant Housing
+      + [Deprivation Index](geomarker.io/dep_index)
+      
+  * Long Term Care Facility Locations (ltcf)
+
+</font>
+
+<br>
+
+<br>
+
+<br>
+
+<font size="2">
+
+Map created by CCHMC GRAPPH.
+
+For questions, contact erika.rasnick@cchmc.org
+
+</font>
+
+Column {data-width=750}
+-----------------------------------------------------------------------
+
+```{r, fig.width = 13.5, fig.height = 10, fig.align='center'}
+library(tidyverse)
+library(leaflet)
+library(sf)
+library(tmap)
+
+d_tract <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/covid_tract_data.rds') %>% 
+  st_transform(3735) %>% 
+  select(-pop_under_18, -pop_over_50, -pop_over_80, 
+         -percBlack, -percHisp, -poverty)
+
+
+ltcf <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/ltcf.rds') %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326)
+
+# d_tract_for_map <- d_tract %>% 
+#   pivot_longer(cols = positive_per_pop:dep_index, 
+#                names_to = "variable", 
+#                values_to = "value") %>% 
+#   st_as_sf() %>% 
+#   st_transform(3735)
+
+tmap_mode('view')
+
+legend_labels <-  c('Positive Tests Per 1000 People', 
+                     'Tests Per 1000 People', 
+                     'Fraction Positive Tests', 
+                     'Percent People of Color', 
+                     'Racial/Economic ICE', 
+                     'Total Population', 
+                     'Population Over Age 65', 
+                     'Population Density', 
+                     '% Crowding', 
+                     'Fraction Assisted Income', 
+                     'Fraction High School Education', 
+                     'Median Income', 
+                     'Fraction No Health Insurance', 
+                     'Fraction Poverty', 
+                     'Fraction Vacant Housing', 
+                    'Deprivation Index')
+
+tm <- tm_shape(d_tract) +
+  tm_polygons(col = "grey50", 
+              alpha = 0.2, 
+              title.col = 'Tracts') +
+  tm_shape(d_tract) +
+  tm_polygons(col = names(d_tract)[2:17], 
+              title = legend_labels,
+              alpha = 0.5, 
+              palette = 'viridis', 
+              style = "quantile") +
+  tm_facets(as.layers = TRUE, 
+            free.scales.fill = TRUE) + 
+  tm_shape(ltcf) +
+  tm_dots(size = 0.1, 
+          col = "black", 
+          title = 'Long Term Care Facilities',
+          alpha = 0.5) +
+  tm_scale_bar()
+
+tm %>%
+  tmap_leaflet() %>% 
+  leaflet::hideGroup(legend_labels[2:16]) %>% 
+  addLegend("bottomright", values = dates,
+            colors = "black", 
+            labels = "Long Term Care Facilities",
+            title = "",
+            opacity = 1
+  )
+
+```
+
+
