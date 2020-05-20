@@ -3,13 +3,13 @@ library(sf)
 
 hc_tracts <- tigris::tracts(state = "Ohio", county = "Hamilton")
 
-d <- read_csv("ltcf_geocoded.csv")
+d <- read_csv("./data/ltcf_geocoded.csv")
 
 d %>%
   st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>%
   mapview::mapview()
 
-d_tract <- read_csv("PHDGP_ACS2014_2018_tract.csv") %>%
+d_tract <- read_csv("./data/PHDGP_ACS2014_2018_tract.csv") %>%
   mutate(GEOID = as.character(GEOID))
 
 dep_index <- 'https://github.com/cole-brokamp/dep_index/raw/master/ACS_deprivation_index_by_census_tracts.rds' %>%
@@ -21,7 +21,7 @@ dep_index <- 'https://github.com/cole-brokamp/dep_index/raw/master/ACS_deprivati
 d_tract <- d_tract %>%
   left_join(dep_index, by = c('GEOID' = 'census_tract_fips'))
 
-d_tests <- read_csv("CCHMC 05.16.2020.csv")
+d_tests <- read_csv("./data/CCHMC 05.16.2020.csv")
 
 names(d_tests)
 
@@ -86,7 +86,7 @@ d_tract <- d_tract %>%
   mutate(positive_per_1000pop = positive_tests/pop_total * 1000,
          tests_per_1000pop = total_tests/pop_total * 1000,
          positive_per_tests = positive_tests/total_tests,
-         pop_density = pop_total/ALAND) %>%
+         pop_density = pop_total/ALAND*1000000) %>%
   select(census_tract_fips = GEOID,
          positive_per_1000pop, tests_per_1000pop, positive_per_tests,
          percBlack, percHisp, percColor, ICEwnhinc,
@@ -97,4 +97,14 @@ saveRDS(d_tract, "./data/covid_tract_data.rds")
 aws.s3::s3saveRDS(d_tract, "s3://geomarker/covid_testing_locations/covid_tract_data.rds")
 
 aws.s3::s3saveRDS(ltcf, "s3://geomarker/covid_testing_locations/ltcf.rds")
+
+nursing_homes <- read_csv('./data/Nursing Homes-Grid view_geocoded.csv')
+aws.s3::s3saveRDS(nursing_homes, "s3://geomarker/covid_testing_locations/nursing_homes.rds")
+
+prisons_jails <- read_csv('./data/Prisons_Jails-Grid view_geocoded.csv')
+aws.s3::s3saveRDS(prisons_jails, "s3://geomarker/covid_testing_locations/prisons_jails.rds")
+
+
+
+
 
