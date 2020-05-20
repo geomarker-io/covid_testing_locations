@@ -1,0 +1,178 @@
+---
+title: "COVID-19 Testing Site Planning"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: fill
+    theme: bootstrap
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+```
+
+Column {data-width=250}
+-----------------------------------------------------------------------
+
+<font size="3.5">
+
+This map displays census tract-level data in Hamilton County for informing decisions on COVID testing locations.
+
+Using the menu on the left-hand side of the map, you can toggle variables on/off.
+
+Clicking on a tract displays all variables for that tract.
+
+</font>
+
+<font size="3">
+
+Variables Include: 
+
+  * American Community Survey Sociodemographic Variables from [The Public Health Disparities Geocoding Project](https://www.hsph.harvard.edu/thegeocodingproject/covid-19-resources/)
+      + Percent People of Color (not White Non-Hispanic / Total)
+      + Racial/Economic ICE (Index of Concentration at the Extremes for white non-Hispanic high income vs. people of color low income)
+      + Total Population 
+      + % Crowding (>1 person per room)
+      
+  * Other American Community Survey Sociodeomgraphic Variables
+      + Population Over Age 65
+      + Population Density (people per km)
+      + Fraction Assisted Income
+      + Fraction High School Education
+      + Median Income
+      + Fraction No Health Insurance
+      + Fraction Poverty
+      + Fraction Vacant Housing
+      + [Deprivation Index](geomarker.io/dep_index)
+      
+  * Long Term Care Facility Locations (from CHD)
+  
+  * Nursing Home Locations (from Cincy Tech)
+  
+  * Prison and Jail Locations (from Cincy Tech)
+  
+
+</font>
+
+<br>
+
+<br>
+
+<br>
+
+<font size="2">
+
+Map created by CCHMC GRAPPH.
+
+For questions, contact erika.rasnick@cchmc.org
+
+</font>
+
+Column {data-width=750}
+-----------------------------------------------------------------------
+
+```{r, fig.width = 13.5, fig.height = 10, fig.align='center'}
+library(tidyverse)
+library(leaflet)
+library(sf)
+library(tmap)
+
+d_tract <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/covid_tract_data.rds') %>% 
+  st_transform(3735) %>% 
+  mutate_at(vars(positive_per_tests, percBlack, percHisp, percColor, crowding, poverty, 
+                 fraction_assisted_income, fraction_high_school_edu, fraction_no_health_ins, 
+                 fraction_poverty, fraction_vacant_housing), ~round(.*100)) %>% 
+    select(-pop_under_18, -pop_over_50, -pop_over_80, 
+         -percBlack, -percHisp, -poverty, 
+         -positive_per_1000pop, -tests_per_1000pop, -positive_per_tests) %>% 
+  mutate_if(is.numeric, ~round(., 2))
+
+
+ltcf <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/ltcf.rds') %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+nursing_homes <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/nursing_homes.rds') %>% 
+  filter(!is.na(lat)) %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+prisons_jails <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/prisons_jails.rds') %>% 
+  filter(!is.na(lat)) %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+# d_tract_for_map <- d_tract %>% 
+#   pivot_longer(cols = positive_per_pop:dep_index, 
+#                names_to = "variable", 
+#                values_to = "value") %>% 
+#   st_as_sf() %>% 
+#   st_transform(3735)
+
+tmap_mode('view')
+
+legend_labels <-  c('% People of Color' = 'percColor', 
+                     'Racial/Economic ICE' = 'ICEwnhinc', 
+                     'Total Population' = 'pop_total', 
+                     'Population Over Age 65' = 'pop_over_65', 
+                     'Population Density' = 'pop_density', 
+                     '% Crowding' = 'crowding', 
+                     '% Assisted Income' = 'fraction_assisted_income', 
+                     '% High School Education' = 'fraction_high_school_edu', 
+                     'Median Income' = 'median_income', 
+                     '% No Health Insurance' = 'fraction_no_health_ins', 
+                     '% Poverty' = 'fraction_poverty', 
+                     '% Vacant Housing' = 'fraction_vacant_housing', 
+                    'Deprivation Index' = 'dep_index')
+
+tm <- tm_shape(d_tract, 
+               name = 'Tracts') +
+  tm_polygons(col = "grey50", 
+              alpha = 0.2) +
+  tm_shape(d_tract) +
+  tm_polygons(col = names(d_tract)[2:14], 
+              title = names(legend_labels),
+              alpha = 0.5, 
+              palette = 'viridis', 
+              style = "quantile", 
+              popup.vars = legend_labels) +
+  tm_facets(as.layers = TRUE, 
+            free.scales.fill = TRUE) + 
+  tm_shape(ltcf, name = 'Long Term Care Facilities') +
+  tm_dots(size = 0.1, 
+          col = "black",
+          alpha = 0.5) +
+  tm_shape(nursing_homes, name = 'Nursing Homes') +
+  tm_dots(size = 0.1, 
+          col = "blue",
+          alpha = 0.5) +
+  tm_shape(prisons_jails, name = 'Prisons and Jails') +
+  tm_dots(size = 0.1, 
+          col = "red",
+          alpha = 0.5) +
+  tm_scale_bar()
+
+tm %>%
+  tmap_leaflet() %>% 
+  leaflet::hideGroup(names(legend_labels)[2:13]) %>% 
+    leaflet::hideGroup('Nursing Homes') %>% 
+      leaflet::hideGroup('Prisons and Jails') %>% 
+  addLegend("bottomright", values = dates,
+            colors = "black", 
+            labels = "Long Term Care Facilities",
+            title = "",
+            opacity = 1) %>% 
+    addLegend("bottomright", values = dates,
+            colors = "blue", 
+            labels = "Nursing Homes",
+            title = "",
+            opacity = 1) %>% 
+      addLegend("bottomright", values = dates,
+            colors = "red", 
+            labels = "Prisons and Jails",
+            title = "",
+            opacity = 1)
+
+```
+
+
