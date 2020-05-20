@@ -1,6 +1,8 @@
 
 # covid_testing_locations
 
+View the map [here](covid_testing_map_public.html)
+
 <!-- badges: start -->
 <!-- badges: end -->
 
