@@ -3,10 +3,6 @@ library(sf)
 
 hc_tracts <- tigris::tracts(state = "Ohio", county = "Hamilton")
 
-# d %>%
-#   st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>%
-#   mapview::mapview()
-
 d_tract <- read_csv("./data/PHDGP_ACS2014_2018_tract.csv") %>%
   mutate(GEOID = as.character(GEOID))
 
@@ -148,5 +144,9 @@ aws.s3::s3saveRDS(prisons_jails, "s3://geomarker/covid_testing_locations/prisons
 schools_reccenters <- read_csv('./data/covid_resource_schools_rec_centers_geocoded.csv')
 aws.s3::s3saveRDS(schools_reccenters, "s3://geomarker/covid_testing_locations/schools_reccenters.rds")
 
+shelters <- read_csv('./data/Shelter_Listings_geocoded.csv')
+aws.s3::s3saveRDS(shelters, "s3://geomarker/covid_testing_locations/shelters.rds")
 
+cmha <- read_csv('./data/cmha_addresses_geocoded.csv')
+aws.s3::s3saveRDS(cmha, "s3://geomarker/covid_testing_locations/cmha.rds")
 

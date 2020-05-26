@@ -44,12 +44,19 @@ Variables Include:
       + Fraction Poverty
       + Fraction Vacant Housing
       + [Deprivation Index](https://geomarker.io/dep_inde)
-      
-  * Long Term Care Facility Locations (from CHD)
   
-  * Nursing Home Locations (from Cincy Tech)
+  * Facilities at risk for outbreak
+      + Long Term Care Facilities (from CHD)
+      + Nursing Homes (from Cincy Tech)
+      + Prisons and Jails (from Cincy Tech)
+      + Shelters
+      + CMHA Housing
   
-  * Prison and Jail Locations (from Cincy Tech)
+  * Existing Testing Locations
+  
+  * Potential Testing Locations
+      + Cincinnati Public Schools
+      + Rec Centers
   
 
 </font>
@@ -113,6 +120,16 @@ schools <- schools_reccenters %>%
 reccenters <- schools_reccenters %>% 
   filter(Group == 'Rec_Center')
 
+shelters <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/shelters.rds') %>% 
+  filter(!is.na(lat)) %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+cmha <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/cmha.rds') %>% 
+  filter(!is.na(lat)) %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
 # d_tract_for_map <- d_tract %>% 
 #   pivot_longer(cols = positive_per_pop:dep_index, 
 #                names_to = "variable", 
@@ -169,6 +186,14 @@ tm <- tm_shape(d_neigh,
   tm_dots(size = 0.1, 
           col = "purple",
           alpha = 0.5) +
+  tm_shape(shelters, name = 'Shelters') +
+  tm_dots(size = 0.1, 
+          col = "green",
+          alpha = 0.5) +
+  tm_shape(cmha, name = 'CMHA Housing') +
+  tm_dots(size = 0.1, 
+          col = "gray",
+          alpha = 0.5) +
   tm_scale_bar()
 
 
@@ -179,6 +204,8 @@ tm %>%
       leaflet::hideGroup('Prisons and Jails') %>% 
         leaflet::hideGroup('Public Schools') %>% 
         leaflet::hideGroup('Rec Centers') %>% 
+          leaflet::hideGroup('Shelters') %>% 
+            leaflet::hideGroup('CMHA Housing') %>% 
   addLegend("bottomright", values = dates,
             colors = "black", 
             labels = "Long Term Care Facilities",
@@ -202,6 +229,16 @@ tm %>%
         addLegend("bottomright", values = dates,
             colors = "purple", 
             labels = "Rec Centers",
+            title = "",
+            opacity = 1) %>% 
+          addLegend("bottomright", values = dates,
+            colors = "green", 
+            labels = "Shelters",
+            title = "",
+            opacity = 1) %>% 
+  addLegend("bottomright", values = dates,
+            colors = "gray", 
+            labels = "CMHA Housing",
             title = "",
             opacity = 1)
 
