@@ -3,11 +3,9 @@ library(sf)
 
 hc_tracts <- tigris::tracts(state = "Ohio", county = "Hamilton")
 
-d <- read_csv("./data/ltcf_geocoded.csv")
-
-d %>%
-  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>%
-  mapview::mapview()
+# d %>%
+#   st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>%
+#   mapview::mapview()
 
 d_tract <- read_csv("./data/PHDGP_ACS2014_2018_tract.csv") %>%
   mutate(GEOID = as.character(GEOID))
@@ -21,7 +19,7 @@ dep_index <- 'https://github.com/cole-brokamp/dep_index/raw/master/ACS_deprivati
 d_tract <- d_tract %>%
   left_join(dep_index, by = c('GEOID' = 'census_tract_fips'))
 
-d_tests <- read_csv("./data/CCHMC 05.16.2020.csv")
+d_tests <- read_csv("./data/CCHMC 05.23.2020.csv")
 
 names(d_tests)
 
@@ -80,7 +78,46 @@ pop_age <- pop_age %>%
   select(GEOID, pop_under_18, pop_over_50, pop_over_65, pop_over_80)
 
 d_tract <- d_tract %>%
-  left_join(pop_age, by = 'GEOID')
+  right_join(pop_age, by = 'GEOID')
+
+mapview::mapview(d_tract)
+
+tract_to_neigh <- readRDS('tract_to_neighborhood.rds')
+
+d_neigh <- d_tract %>%
+  mutate(crowding_num = crowding * pop_total,
+         percColor_num = percColor * pop_total,
+         ice_num = ICEwnhinc * pop_total) %>%
+  left_join(tract_to_neigh, by = c('GEOID' = 'fips_tract_id')) %>%
+  group_by(neighborhood) %>%
+  summarize_at(vars(ALAND, pop_total:pop_api, positive_tests:pop_over_80,
+                    crowding_num, percColor_num, ice_num),
+               sum, na.rm = TRUE)
+
+d_neigh_avgs <- d_tract %>%
+  st_drop_geometry() %>%
+  left_join(tract_to_neigh, by = c('GEOID' = 'fips_tract_id')) %>%
+  group_by(neighborhood) %>%
+  summarize_at(vars(fraction_assisted_income:dep_index), mean, na.rm = TRUE)
+
+d_neigh <- d_neigh %>%
+  left_join(d_neigh_avgs, by = 'neighborhood') %>%
+  mutate(positive_per_1000pop = positive_tests/pop_total * 1000,
+         tests_per_1000pop = total_tests/pop_total * 1000,
+         positive_per_tests = positive_tests/total_tests,
+         pop_density = pop_total/ALAND*1000000,
+         crowding = crowding_num/pop_total,
+         percColor = percColor_num/pop_total,
+         ICEwnhinc = ice_num/pop_total) %>%
+  select(neighborhood,
+         positive_per_1000pop, tests_per_1000pop, positive_per_tests,
+         percColor, ICEwnhinc,
+         pop_total, pop_under_18, pop_over_50, pop_over_65, pop_over_80,
+         pop_density, crowding, fraction_assisted_income:dep_index)
+
+
+saveRDS(d_neigh, "./data/covid_neighborhood_data.rds")
+aws.s3::s3saveRDS(d_neigh, "s3://geomarker/covid_testing_locations/covid_neighborhood_data.rds")
 
 d_tract <- d_tract %>%
   mutate(positive_per_1000pop = positive_tests/pop_total * 1000,
@@ -93,9 +130,13 @@ d_tract <- d_tract %>%
          pop_total, pop_under_18, pop_over_50, pop_over_65, pop_over_80,
          pop_density, crowding, poverty, fraction_assisted_income:dep_index)
 
+
+
 saveRDS(d_tract, "./data/covid_tract_data.rds")
 aws.s3::s3saveRDS(d_tract, "s3://geomarker/covid_testing_locations/covid_tract_data.rds")
 
+
+d <- read_csv("./data/ltcf_geocoded.csv")
 aws.s3::s3saveRDS(ltcf, "s3://geomarker/covid_testing_locations/ltcf.rds")
 
 nursing_homes <- read_csv('./data/Nursing Homes-Grid view_geocoded.csv')
@@ -104,7 +145,8 @@ aws.s3::s3saveRDS(nursing_homes, "s3://geomarker/covid_testing_locations/nursing
 prisons_jails <- read_csv('./data/Prisons_Jails-Grid view_geocoded.csv')
 aws.s3::s3saveRDS(prisons_jails, "s3://geomarker/covid_testing_locations/prisons_jails.rds")
 
-
+schools_reccenters <- read_csv('./data/covid_resource_schools_rec_centers_geocoded.csv')
+aws.s3::s3saveRDS(schools_reccenters, "s3://geomarker/covid_testing_locations/schools_reccenters.rds")
 
 
 
