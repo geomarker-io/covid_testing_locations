@@ -130,6 +130,15 @@ cmha <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/cmha.rds') %>%
   st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
   st_transform(3735)
 
+health_centers <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/health_centers.rds') %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+health_center_isochrones_10min_walk <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/health_center_isochrones_10min_walk.rds')  %>% 
+  st_as_sf()
+health_center_isochrones_15min_drive <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/health_center_isochrones_15min_drive.rds')  %>% 
+  st_as_sf()
+
 # d_tract_for_map <- d_tract %>% 
 #   pivot_longer(cols = positive_per_pop:dep_index, 
 #                names_to = "variable", 
@@ -154,7 +163,7 @@ legend_labels <-  c('% People of Color' = 'percColor',
                     'Deprivation Index' = 'dep_index')
 
 tm <- tm_shape(d_neigh, 
-               name = 'Tracts') +
+               name = 'Neighborhoods') +
   tm_polygons(col = "grey50", 
               alpha = 0.2) +
   tm_shape(d_neigh) +
@@ -194,18 +203,30 @@ tm <- tm_shape(d_neigh,
   tm_dots(size = 0.1, 
           col = "gray",
           alpha = 0.5) +
+  tm_shape(health_centers, name = 'Existing Testing Locations') +
+  tm_dots(size = 0.1, 
+          col = "white",
+          alpha = 0.5) +
+  tm_shape(health_center_isochrones_10min_walk, 
+           name = '10-min walk buffer to test site') +
+  tm_polygons(col = 'white', alpha = 0.5) +
+  tm_shape(health_center_isochrones_15min_drive, 
+           name = '15-min drive buffer to test site') +
+  tm_polygons(col = 'gray', alpha = 0.5) +
   tm_scale_bar()
 
 
 tm %>%
   tmap_leaflet() %>% 
   leaflet::hideGroup(names(legend_labels)[2:13]) %>% 
+      leaflet::hideGroup('Long Term Care Facilities') %>% 
     leaflet::hideGroup('Nursing Homes') %>% 
       leaflet::hideGroup('Prisons and Jails') %>% 
         leaflet::hideGroup('Public Schools') %>% 
         leaflet::hideGroup('Rec Centers') %>% 
           leaflet::hideGroup('Shelters') %>% 
             leaflet::hideGroup('CMHA Housing') %>% 
+              leaflet::hideGroup('15-min drive buffer to test site') %>% 
   addLegend("bottomright", values = dates,
             colors = "black", 
             labels = "Long Term Care Facilities",
@@ -239,6 +260,11 @@ tm %>%
   addLegend("bottomright", values = dates,
             colors = "gray", 
             labels = "CMHA Housing",
+            title = "",
+            opacity = 1) %>% 
+    addLegend("bottomright", values = dates,
+            colors = "white", 
+            labels = "Existing Testing Locations",
             title = "",
             opacity = 1)
 
