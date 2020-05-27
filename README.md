@@ -1,7 +1,7 @@
 
 # covid_testing_locations
 
-View the map [here](covid_testing_map_public.html)
+View the public map at https://geomarker.io/covid_testing_locations
 
 <!-- badges: start -->
 <!-- badges: end -->
