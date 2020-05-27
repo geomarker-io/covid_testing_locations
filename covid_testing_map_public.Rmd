@@ -28,6 +28,8 @@ Clicking on a tract displays all variables for that tract.
 
 Variables Include: 
 
+  * Neighborhood Testing Site Coverage (fraction of neighborhood within 10-min walk of existing test site)
+
   * American Community Survey Sociodemographic Variables from [The Public Health Disparities Geocoding Project](https://www.hsph.harvard.edu/thegeocodingproject/covid-19-resources/)
       + Percent People of Color (not White Non-Hispanic / Total)
       + Racial/Economic ICE (Index of Concentration at the Extremes for white non-Hispanic high income vs. people of color low income)
@@ -53,6 +55,7 @@ Variables Include:
       + CMHA Housing
   
   * Existing Testing Locations
+      + CHD Health Centers
   
   * Potential Testing Locations
       + Cincinnati Public Schools
@@ -78,7 +81,7 @@ For questions, contact erika.rasnick@cchmc.org
 Column {data-width=750}
 -----------------------------------------------------------------------
 
-```{r, fig.width = 13.5, fig.height = 10, fig.align='center'}
+```{r data}
 library(tidyverse)
 library(leaflet)
 library(sf)
@@ -138,14 +141,9 @@ health_center_isochrones_10min_walk <- aws.s3::s3readRDS('s3://geomarker/covid_t
   st_as_sf()
 health_center_isochrones_15min_drive <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/health_center_isochrones_15min_drive.rds')  %>% 
   st_as_sf()
+```
 
-# d_tract_for_map <- d_tract %>% 
-#   pivot_longer(cols = positive_per_pop:dep_index, 
-#                names_to = "variable", 
-#                values_to = "value") %>% 
-#   st_as_sf() %>% 
-#   st_transform(3735)
-
+```{r map, fig.width = 13.5, fig.height = 10, fig.align='center'}
 tmap_mode('view')
 
 legend_labels <-  c('% People of Color' = 'percColor', 
@@ -160,18 +158,41 @@ legend_labels <-  c('% People of Color' = 'percColor',
                      '% No Health Insurance' = 'fraction_no_health_ins', 
                      '% Poverty' = 'fraction_poverty', 
                      '% Vacant Housing' = 'fraction_vacant_housing', 
-                    'Deprivation Index' = 'dep_index')
+                    'Deprivation Index' = 'dep_index', 
+                    'Fraction Neighborhood Coverage' = 'frac_coverage')
 
 tm <- tm_shape(d_neigh, 
                name = 'Neighborhoods') +
   tm_polygons(col = "grey50", 
               alpha = 0.2) +
+  tm_shape(d_neigh, name = names(legend_labels)[14]) +
+  tm_polygons(col = names(d_neigh)[16], 
+              title = names(legend_labels)[14],
+              alpha = 0.5, 
+              palette = '-viridis', 
+              style = "cont", 
+              popup.vars = legend_labels) +
   tm_shape(d_neigh) +
-  tm_polygons(col = names(d_neigh)[2:14], 
-              title = names(legend_labels),
+  tm_polygons(col = names(d_neigh)[c(2, 4:8, 11:14)], 
+              title = names(legend_labels)[c(1, 3:7, 10:13)],
               alpha = 0.5, 
               palette = 'viridis', 
               style = "quantile", 
+              popup.vars = legend_labels) +
+  tm_shape(d_neigh, name = names(legend_labels)[2]) +
+  tm_polygons(col = names(d_neigh)[3], 
+              title = names(legend_labels)[2],
+              alpha = 0.5, 
+              palette = '-viridis', 
+              style = "quantile",
+              midpoint = 0,
+              popup.vars = legend_labels) +
+  tm_shape(d_neigh, name = names(legend_labels)[8:9]) +
+  tm_polygons(col = names(d_neigh)[c(9:10)], 
+              title = names(legend_labels)[8:9],
+              alpha = 0.5, 
+              palette = '-viridis', 
+              style = "quantile",
               popup.vars = legend_labels) +
   tm_facets(as.layers = TRUE, 
             free.scales.fill = TRUE) + 
@@ -218,7 +239,7 @@ tm <- tm_shape(d_neigh,
 
 tm %>%
   tmap_leaflet() %>% 
-  leaflet::hideGroup(names(legend_labels)[2:13]) %>% 
+  leaflet::hideGroup(names(legend_labels)[1:13]) %>% 
       leaflet::hideGroup('Long Term Care Facilities') %>% 
     leaflet::hideGroup('Nursing Homes') %>% 
       leaflet::hideGroup('Prisons and Jails') %>% 

@@ -28,6 +28,8 @@ Clicking on a tract displays all variables for that tract.
 
 Variables Include: 
 
+  * Neighborhood Testing Site Coverage (fraction of neighborhood within 10-min walk of existing test site)
+
   * Testing Variables
       + Positive Tests per 1000 Population
       + Total Tests per 1000 Population
@@ -50,11 +52,19 @@ Variables Include:
       + Fraction Vacant Housing
       + [Deprivation Index](https://geomarker.io/dep_index)
       
-  * Long Term Care Facility Locations (ltcf)
+  * Facilities at risk for outbreak
+      + Long Term Care Facilities (from CHD)
+      + Nursing Homes (from Cincy Tech)
+      + Prisons and Jails (from Cincy Tech)
+      + Shelters
+      + CMHA Housing
   
-  * Nursing Home Locations (from Cincy Tech)
+  * Existing Testing Locations
+      + CHD Health Centers
   
-  * Prison and Jail Locations (from Cincy Tech)
+  * Potential Testing Locations
+      + Cincinnati Public Schools
+      + Rec Centers
 
 </font>
 
@@ -75,20 +85,19 @@ For questions, contact erika.rasnick@cchmc.org
 Column {data-width=750}
 -----------------------------------------------------------------------
 
-```{r, fig.width = 13.5, fig.height = 10, fig.align='center'}
+```{r data}
 library(tidyverse)
 library(leaflet)
 library(sf)
 library(tmap)
 
-d_tract <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/covid_tract_data.rds') %>% 
+d_neigh <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/covid_neighborhood_data.rds') %>% 
   st_transform(3735) %>% 
-  mutate_at(vars(positive_per_tests, percBlack, percHisp, percColor, crowding, poverty, 
+  mutate_at(vars(positive_per_tests, percColor, crowding, 
                  fraction_assisted_income, fraction_high_school_edu, fraction_no_health_ins, 
                  fraction_poverty, fraction_vacant_housing), ~round(.*100)) %>% 
-  select(-pop_under_18, -pop_over_50, -pop_over_80, 
-         -percBlack, -percHisp, -poverty) %>% 
-    mutate_if(is.numeric, ~round(., 2))
+    select(-pop_under_18, -pop_over_50, -pop_over_80) %>% 
+  mutate_if(is.numeric, ~round(., 2))
 
 ltcf <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/ltcf.rds') %>% 
   st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
@@ -104,13 +113,40 @@ prisons_jails <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/priso
   st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
   st_transform(3735)
 
-# d_tract_for_map <- d_tract %>% 
-#   pivot_longer(cols = positive_per_pop:dep_index, 
-#                names_to = "variable", 
-#                values_to = "value") %>% 
-#   st_as_sf() %>% 
-#   st_transform(3735)
+schools_reccenters <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/schools_reccenters.rds') %>% 
+  filter(!is.na(lat)) %>% 
+  select(-Tier) %>% 
+  rename(lon = long) %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
 
+schools <- schools_reccenters %>% 
+  filter(Group == 'CPS')
+
+reccenters <- schools_reccenters %>% 
+  filter(Group == 'Rec_Center')
+
+shelters <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/shelters.rds') %>% 
+  filter(!is.na(lat)) %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+cmha <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/cmha.rds') %>% 
+  filter(!is.na(lat)) %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+health_centers <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/health_centers.rds') %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+health_center_isochrones_10min_walk <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/health_center_isochrones_10min_walk.rds')  %>% 
+  st_as_sf()
+health_center_isochrones_15min_drive <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/health_center_isochrones_15min_drive.rds')  %>% 
+  st_as_sf()
+```
+
+```{r map, , fig.width = 13.5, fig.height = 10, fig.align='center'}
 tmap_mode('view')
 
 legend_labels <-  c('Positive Tests Per 1000 People' = 'positive_per_1000pop', 
@@ -128,17 +164,41 @@ legend_labels <-  c('Positive Tests Per 1000 People' = 'positive_per_1000pop',
                      '% No Health Insurance' = 'fraction_no_health_ins', 
                      '% Poverty' = 'fraction_poverty', 
                      '% Vacant Housing' = 'fraction_vacant_housing', 
-                    'Deprivation Index' = 'dep_index')
+                    'Deprivation Index' = 'dep_index', 
+                    'Fraction Neighborhood Coverage' = 'frac_coverage')
 
-tm <- tm_shape(d_tract, name = 'Tracts') +
+tm <- tm_shape(d_neigh, 
+               name = 'Neighborhoods') +
   tm_polygons(col = "grey50", 
               alpha = 0.2,) +
-  tm_shape(d_tract) +
-  tm_polygons(col = names(d_tract)[2:17], 
-              title = names(legend_labels),
+  tm_shape(d_neigh, name = names(legend_labels)[17]) +
+  tm_polygons(col = names(d_neigh)[19], 
+              title = names(legend_labels)[17],
+              alpha = 0.5, 
+              palette = '-viridis', 
+              style = "cont", 
+              popup.vars = legend_labels) +
+  tm_shape(d_neigh) +
+  tm_polygons(col = names(d_neigh)[c(2:5, 7:11, 14:17)], 
+              title = names(legend_labels)[c(1:4, 6:10, 13:16)],
               alpha = 0.5, 
               palette = 'viridis', 
               style = "quantile", 
+              popup.vars = legend_labels) +
+  tm_shape(d_neigh, name = names(legend_labels)[5]) +
+  tm_polygons(col = names(d_neigh)[6], 
+              title = names(legend_labels)[5],
+              alpha = 0.5, 
+              palette = '-viridis', 
+              style = "quantile",
+              midpoint = 0,
+              popup.vars = legend_labels) +
+  tm_shape(d_neigh, name = names(legend_labels)[11:12]) +
+  tm_polygons(col = names(d_neigh)[c(12:13)], 
+              title = names(legend_labels)[11:12],
+              alpha = 0.5, 
+              palette = '-viridis', 
+              style = "quantile",
               popup.vars = legend_labels) +
   tm_facets(as.layers = TRUE, 
             free.scales.fill = TRUE) + 
@@ -154,13 +214,45 @@ tm <- tm_shape(d_tract, name = 'Tracts') +
   tm_dots(size = 0.1, 
           col = "red",
           alpha = 0.5) +
+    tm_shape(schools, name = 'Public Schools') +
+  tm_dots(size = 0.1,
+          col = "orange",
+          alpha = 0.5) +
+  tm_shape(reccenters, name = 'Rec Centers') +
+  tm_dots(size = 0.1, 
+          col = "purple",
+          alpha = 0.5) +
+  tm_shape(shelters, name = 'Shelters') +
+  tm_dots(size = 0.1, 
+          col = "green",
+          alpha = 0.5) +
+  tm_shape(cmha, name = 'CMHA Housing') +
+  tm_dots(size = 0.1, 
+          col = "gray",
+          alpha = 0.5) +
+  tm_shape(health_centers, name = 'Existing Testing Locations') +
+  tm_dots(size = 0.1, 
+          col = "white",
+          alpha = 0.5) +
+  tm_shape(health_center_isochrones_10min_walk, 
+           name = '10-min walk buffer to test site') +
+  tm_polygons(col = 'white', alpha = 0.5) +
+  tm_shape(health_center_isochrones_15min_drive, 
+           name = '15-min drive buffer to test site') +
+  tm_polygons(col = 'gray', alpha = 0.5) +
   tm_scale_bar()
 
 tm %>%
   tmap_leaflet() %>% 
-  leaflet::hideGroup(names(legend_labels)[2:16]) %>% 
+  leaflet::hideGroup(names(legend_labels)[1:16]) %>% 
+      leaflet::hideGroup('Long Term Care Facilities') %>% 
     leaflet::hideGroup('Nursing Homes') %>% 
       leaflet::hideGroup('Prisons and Jails') %>% 
+        leaflet::hideGroup('Public Schools') %>% 
+        leaflet::hideGroup('Rec Centers') %>% 
+          leaflet::hideGroup('Shelters') %>% 
+            leaflet::hideGroup('CMHA Housing') %>% 
+              leaflet::hideGroup('15-min drive buffer to test site') %>% 
   addLegend("bottomright", values = dates,
             colors = "black", 
             labels = "Long Term Care Facilities",
@@ -174,6 +266,31 @@ tm %>%
       addLegend("bottomright", values = dates,
             colors = "red", 
             labels = "Prisons and Jails",
+            title = "",
+            opacity = 1) %>% 
+        addLegend("bottomright", values = dates,
+            colors = "orange", 
+            labels = "Public Schools",
+            title = "",
+            opacity = 1) %>% 
+        addLegend("bottomright", values = dates,
+            colors = "purple", 
+            labels = "Rec Centers",
+            title = "",
+            opacity = 1) %>% 
+          addLegend("bottomright", values = dates,
+            colors = "green", 
+            labels = "Shelters",
+            title = "",
+            opacity = 1) %>% 
+  addLegend("bottomright", values = dates,
+            colors = "gray", 
+            labels = "CMHA Housing",
+            title = "",
+            opacity = 1) %>% 
+    addLegend("bottomright", values = dates,
+            colors = "white", 
+            labels = "Existing Testing Locations",
             title = "",
             opacity = 1)
 

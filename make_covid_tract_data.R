@@ -114,6 +114,7 @@ d_neigh <- d_neigh %>%
 
 saveRDS(d_neigh, "./data/covid_neighborhood_data.rds")
 aws.s3::s3saveRDS(d_neigh, "s3://geomarker/covid_testing_locations/covid_neighborhood_data.rds")
+d_neigh <- aws.s3::s3readRDS("s3://geomarker/covid_testing_locations/covid_neighborhood_data.rds")
 
 d_tract <- d_tract %>%
   mutate(positive_per_1000pop = positive_tests/pop_total * 1000,
@@ -192,7 +193,17 @@ mapview::mapview(health_center_isochrones_10min_walk)
 aws.s3::s3saveRDS(health_center_isochrones_15min_drive, "s3://geomarker/covid_testing_locations/health_center_isochrones_15min_drive.rds")
 aws.s3::s3saveRDS(health_center_isochrones_10min_walk, "s3://geomarker/covid_testing_locations/health_center_isochrones_10min_walk.rds")
 
+health_center_isochrones_10min_walk <- aws.s3::s3readRDS("s3://geomarker/covid_testing_locations/health_center_isochrones_10min_walk.rds")
 
+d_neigh <- st_transform(d_neigh, 3735)
 
+d_neigh <- d_neigh %>%
+  mutate(neigh_area = as.numeric(st_area(.)),
+         neigh_intersection = map(row_number(), ~st_intersection(d_neigh[.x,], health_center_isochrones_10min_walk)),
+         intersection_area = as.numeric(map(neigh_intersection, st_area)),
+         intersection_area = ifelse(is.na(intersection_area), 0, intersection_area),
+         frac_coverage = intersection_area/neigh_area) %>%
+  select(-neigh_area, -neigh_intersection, -intersection_area)
 
-
+mapview::mapview(d_neigh, zcol = 'frac_coverage') + mapview::mapview(health_center_isochrones_10min_walk)
+aws.s3::s3saveRDS(d_neigh, "s3://geomarker/covid_testing_locations/covid_neighborhood_data.rds")
