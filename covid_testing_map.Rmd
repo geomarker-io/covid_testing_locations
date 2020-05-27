@@ -16,11 +16,11 @@ Column {data-width=250}
 
 <font size="3.5">
 
-This map displays census tract-level data in Hamilton County for informing decisions on COVID testing locations.
+This map displays neighborhood-level data in Hamilton County for informing decisions on COVID testing locations.
 
 Using the menu on the left-hand side of the map, you can toggle variables on/off.
 
-Clicking on a tract displays all variables for that tract.
+Clicking on a neighborhood displays all variables for that neighborhood
 
 </font>
 
