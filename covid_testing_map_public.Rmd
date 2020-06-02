@@ -141,6 +141,42 @@ health_center_isochrones_10min_walk <- aws.s3::s3readRDS('s3://geomarker/covid_t
   st_as_sf()
 health_center_isochrones_15min_drive <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/health_center_isochrones_15min_drive.rds')  %>% 
   st_as_sf()
+
+
+d_neigh <- d_neigh %>%
+  mutate(neigh_area = as.numeric(st_area(.)),
+         neigh_intersection = map(row_number(), ~st_intersection(d_neigh[.x,], health_center_isochrones_10min_walk)),
+         intersection_area = as.numeric(map(neigh_intersection, st_area)),
+         intersection_area = ifelse(is.na(intersection_area), 0, intersection_area),
+         frac_coverage = intersection_area/neigh_area) %>%
+  select(-neigh_area, -neigh_intersection, -intersection_area)
+
+test_sites_hc <- aws.s3::s3readRDS("s3://geomarker/covid_testing_locations/test_sites_hc.rds") %>% 
+  st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>% 
+  st_transform(3735)
+
+test_sites_isochrones_10min_walk <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/test_sites_isochrones_10min_walk.rds')  %>% 
+  st_as_sf()
+
+test_sites_isochrones_15min_drive <- aws.s3::s3readRDS('s3://geomarker/covid_testing_locations/test_sites_isochrones_15min_drive.rds')  %>% 
+  st_as_sf()
+
+
+all_existing_sites <- rbind(health_centers %>% select(Name = `Health Center Name`, 
+                                                      address = `Health Center address`), 
+                            test_sites_hc %>% select(Name = `System or Hospital`, address))
+all_existing_sites_10min_walk <- st_union(health_center_isochrones_10min_walk, test_sites_isochrones_10min_walk)
+all_existing_sites_15min_drive <- st_union(health_center_isochrones_15min_drive, test_sites_isochrones_15min_drive)
+
+d_neigh <- d_neigh %>%
+  mutate(neigh_area = as.numeric(st_area(.)),
+         neigh_intersection = map(row_number(), ~st_intersection(d_neigh[.x,], all_existing_sites_10min_walk)),
+         intersection_area = as.numeric(map(neigh_intersection, st_area)),
+         intersection_area = ifelse(is.na(intersection_area), 0, intersection_area),
+         frac_coverage = intersection_area/neigh_area) %>%
+  select(-neigh_area, -neigh_intersection, -intersection_area)
+
+city_outline <- aws.s3::s3readRDS("s3://geomarker/geometries/cincinnati_city_outline.rds")
 ```
 
 ```{r map, fig.width = 13.5, fig.height = 10, fig.align='center'}
@@ -224,16 +260,18 @@ tm <- tm_shape(d_neigh,
   tm_dots(size = 0.1, 
           col = "gray",
           alpha = 0.5) +
-  tm_shape(health_centers, name = 'Existing Testing Locations') +
+  tm_shape(all_existing_sites, name = 'Existing Testing Locations') +
   tm_dots(size = 0.1, 
           col = "white",
           alpha = 0.5) +
-  tm_shape(health_center_isochrones_10min_walk, 
+  tm_shape(all_existing_sites_10min_walk, 
            name = '10-min walk buffer to test site') +
   tm_polygons(col = 'white', alpha = 0.5) +
-  tm_shape(health_center_isochrones_15min_drive, 
+  tm_shape(all_existing_sites_15min_drive, 
            name = '15-min drive buffer to test site') +
   tm_polygons(col = 'gray', alpha = 0.5) +
+  tm_shape(city_outline, name = 'City of Cincinnati') +
+  tm_lines(lwd = 3) +
   tm_scale_bar()
 
 
@@ -287,7 +325,8 @@ tm %>%
             colors = "white", 
             labels = "Existing Testing Locations",
             title = "",
-            opacity = 1)
+            opacity = 1) %>% 
+      leaflet.extras::addFullscreenControl()
 
 ```
 
