@@ -15,7 +15,7 @@ dep_index <- 'https://github.com/cole-brokamp/dep_index/raw/master/ACS_deprivati
 d_tract <- d_tract %>%
   left_join(dep_index, by = c('GEOID' = 'census_tract_fips'))
 
-d_tests <- read_csv("./data/CCHMC 05.23.2020.csv")
+d_tests <- read_csv("./data/CCHMC 06.11.2020.csv")
 
 names(d_tests)
 
