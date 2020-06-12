@@ -51,6 +51,8 @@ aws.s3::s3saveRDS(d_neigh, "s3://geomarker/covid_testing_locations/covid_neighbo
 test_sites <- read_csv('./data/Testing Locations_geocoded.csv')
 aws.s3::s3saveRDS(test_sites, "s3://geomarker/covid_testing_locations/test_sites.rds")
 
+test_sites <- filter(test_sites, !is.na(lat))
+
 test_sites %>%
   st_as_sf(coords = c('lon', 'lat'), crs = 4326) %>%
   mapview::mapview()
@@ -62,10 +64,11 @@ test_sites_hc <- st_intersection(test_sites %>%
                                    filter(NAME == "Hamilton") %>%
                                    st_transform(5072))
 
-mapview::mapview(test_sites_hc)
+mapview::mapview(test_sites_hc[30,])
 
 test_sites_hc <- test_sites %>%
   filter(address %in% test_sites_hc$address)
+aws.s3::s3saveRDS(test_sites_hc, "s3://geomarker/covid_testing_locations/test_sites_hc.rds")
 
 library(openrouteservice)
 # download isochrones from ORS

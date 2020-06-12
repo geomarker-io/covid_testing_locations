@@ -165,6 +165,11 @@ test_sites_isochrones_15min_drive <- aws.s3::s3readRDS('s3://geomarker/covid_tes
 all_existing_sites <- rbind(health_centers %>% select(Name = `Health Center Name`, 
                                                       address = `Health Center address`), 
                             test_sites_hc %>% select(Name = `System or Hospital`, address))
+
+all_existing_sites[c(23, 34, 35),1] <- c('Flu Clinic at Mercy Health Bond Hill',
+                                         'The Jewish Hospital Mercy Health Outpatient Clinic',
+                                         'Mercy Health Forest Hills Family Medicine')
+
 all_existing_sites_10min_walk <- st_union(health_center_isochrones_10min_walk, test_sites_isochrones_10min_walk)
 all_existing_sites_15min_drive <- st_union(health_center_isochrones_15min_drive, test_sites_isochrones_15min_drive)
 
@@ -233,43 +238,43 @@ tm <- tm_shape(d_neigh,
   tm_facets(as.layers = TRUE, 
             free.scales.fill = TRUE) + 
   tm_shape(ltcf, name = 'Long Term Care Facilities') +
-  tm_dots(size = 0.1, 
+  tm_dots(size = 0.2, 
           col = "black",
-          alpha = 0.5) +
+          alpha = 0.7) +
   tm_shape(nursing_homes, name = 'Nursing Homes') +
-  tm_dots(size = 0.1, 
+  tm_dots(size = 0.2, 
           col = "blue",
-          alpha = 0.5) +
+          alpha = 0.7) +
   tm_shape(prisons_jails, name = 'Prisons and Jails') +
-  tm_dots(size = 0.1, 
+  tm_dots(size = 0.2, 
           col = "red",
-          alpha = 0.5) +
+          alpha = 0.7) +
   tm_shape(schools, name = 'Public Schools') +
-  tm_dots(size = 0.1,
+  tm_dots(size = 0.2,
           col = "orange",
-          alpha = 0.5) +
+          alpha = 0.7) +
   tm_shape(reccenters, name = 'Rec Centers') +
-  tm_dots(size = 0.1, 
+  tm_dots(size = 0.2, 
           col = "purple",
-          alpha = 0.5) +
+          alpha = 0.7) +
   tm_shape(shelters, name = 'Shelters') +
-  tm_dots(size = 0.1, 
+  tm_dots(size = 0.2, 
           col = "green",
-          alpha = 0.5) +
+          alpha = 0.7) +
   tm_shape(cmha, name = 'CMHA Housing') +
-  tm_dots(size = 0.1, 
+  tm_dots(size = 0.2, 
           col = "gray",
-          alpha = 0.5) +
+          alpha = 0.7) +
   tm_shape(all_existing_sites, name = 'Existing Testing Locations') +
-  tm_dots(size = 0.1, 
+  tm_dots(size = 0.2, 
           col = "white",
-          alpha = 0.5) +
+          alpha = 0.7) +
   tm_shape(all_existing_sites_10min_walk, 
            name = '10-min walk buffer to test site') +
-  tm_polygons(col = 'white', alpha = 0.5) +
+  tm_polygons(col = 'white', alpha = 0.7) +
   tm_shape(all_existing_sites_15min_drive, 
            name = '15-min drive buffer to test site') +
-  tm_polygons(col = 'gray', alpha = 0.5) +
+  tm_polygons(col = 'gray', alpha = 0.7) +
   tm_shape(city_outline, name = 'City of Cincinnati') +
   tm_lines(lwd = 3) +
   tm_scale_bar()
